@@ -1,4 +1,34 @@
 {
+ "emrs": {
+  "generic": {
+   "label": "Any EMR — Metro standard",
+   "setting": "home_health"
+  },
+  "hchb": {
+   "label": "Homecare Homebase",
+   "setting": "home_health"
+  },
+  "careficient": {
+   "label": "Careficient",
+   "setting": "home_health"
+  },
+  "axxess": {
+   "label": "Axxess",
+   "setting": "home_health"
+  },
+  "wellsky": {
+   "label": "WellSky / Kinnser",
+   "setting": "home_health"
+  },
+  "alora": {
+   "label": "Alora",
+   "setting": "home_health"
+  },
+  "hellonote": {
+   "label": "HelloNote",
+   "setting": "outpatient"
+  }
+ },
  "blocks": {
   "history": {
    "label": "Pertinent Medical History",
@@ -198,9 +228,15 @@
    "label": "Justification for Continued Skilled Services",
    "hint": "Personalize the deficits to this patient.",
    "scope": "hh"
+  },
+  "response": {
+   "label": "Patient/Caregiver Response",
+   "hint": "Tolerance of treatment, cues or assistance required, understanding demonstrated, and carryover.",
+   "common": true,
+   "scope": "both"
   }
  },
- "notes": [
+ "profiles": [
   {
    "name": "MMHC PT Eval — HCHB (v2.0)",
    "source": "MMHC_PT_Eval_HCHB.docx",
@@ -268,7 +304,11 @@
      "label": "12. Exercise Log"
     }
    ],
-   "setting": "home_health"
+   "setting": "home_health",
+   "type": "eval",
+   "variant": "HCHB v2.0",
+   "emr": "hchb",
+   "agency": "mmhc"
   },
   {
    "name": "MMHC PT Re-Eval — HCHB (v2.0)",
@@ -378,7 +418,11 @@
      "boiler": "Patient continues to require skilled physical therapy due to persistent deficits in strength, balance, gait mechanics, endurance, and functional mobility. Skilled intervention is necessary for clinical decision-making, manual therapy, gait retraining, and progression of therapeutic exercise. A home exercise program alone is insufficient due to complexity of impairments and need for skilled cueing and monitoring. Without continued therapy, patient is at risk for functional decline, increased fall risk, and delayed recovery."
     }
    ],
-   "setting": "home_health"
+   "setting": "home_health",
+   "type": "reeval",
+   "variant": "HCHB v2.0",
+   "emr": "hchb",
+   "agency": "mmhc"
   },
   {
    "name": "MMHC SOC Dictation (v2.0)",
@@ -425,7 +469,11 @@
      "hint": "Complete SOC narrative using each of these as its own paragraph heading, in order: patient discharged from; primary reason for referral; pertinent medical history; scheduled physician follow up; prior level of function; current level of function including mobility, transfers, ADLs, fall risk; caregiving support; medication management status; skilled care needs including clinical reasoning and need for a licensed therapist; response to initial interventions; homebound status; medical necessity; addendum with environmental or safety concerns; communication with physician or agent including approval of plan of care; disciplines ordered."
     }
    ],
-   "setting": "home_health"
+   "setting": "home_health",
+   "type": "soc",
+   "variant": "v2.0",
+   "emr": "generic",
+   "agency": "mmhc"
   },
   {
    "name": "Medicare Recertification Narrative",
@@ -490,7 +538,67 @@
      "hint": "PT, SN, OT, ST, HHA as applicable."
     }
    ],
-   "setting": "home_health"
+   "setting": "home_health",
+   "type": "recert",
+   "variant": "Medicare",
+   "emr": "generic",
+   "agency": "mmhc"
+  },
+  {
+   "name": "Daily Visit Note",
+   "source": "composed from shared blocks — no source document",
+   "discipline": "PT",
+   "setting": "home_health",
+   "mode": "fields",
+   "type": "daily",
+   "variant": "composed",
+   "rules": [
+    "Paragraph form. Never use the patient's name.",
+    "Do not invent information. Use \"not clearly reported\" where needed.",
+    "Keep it tight — a daily note documents this visit, not the whole episode."
+   ],
+   "sections": [
+    {
+     "ref": "subjective",
+     "label": "Subjective",
+     "hint": "What the patient or caregiver reported this visit: complaints, pain, changes since the last visit."
+    },
+    {
+     "ref": "objective",
+     "label": "Objective",
+     "hint": "Observed and measured findings from this visit only."
+    },
+    {
+     "ref": "interventions",
+     "label": "Skilled Interventions",
+     "hint": "What was performed this visit, with parameters: gait training, transfer training, therapeutic exercise, neuromuscular re-education, manual therapy."
+    },
+    {
+     "ref": "response",
+     "label": "Patient Response"
+    },
+    {
+     "ref": "education",
+     "label": "Education Provided",
+     "hint": "What was taught this visit and to whom."
+    },
+    {
+     "ref": "homebound",
+     "label": "Homebound Status"
+    },
+    {
+     "ref": "exlog",
+     "label": "Exercise Log",
+     "hint": "Exercises performed this visit and purpose."
+    },
+    {
+     "ref": "poc",
+     "label": "Plan for Next Visit",
+     "hint": "Specific focus for the following session and any change to frequency."
+    }
+   ],
+   "emr": "generic",
+   "agency": "mmhc"
   },
   {
    "name": "MMHC PT Initial Eval (v1.0)",
@@ -535,7 +643,11 @@
      "ref": "exlog"
     }
    ],
-   "setting": "home_health"
+   "setting": "home_health",
+   "type": "eval",
+   "variant": "v1.0 superseded",
+   "emr": "generic",
+   "agency": "mmhc"
   },
   {
    "name": "MMHC PT Re-Evaluation (v1.0)",
@@ -591,7 +703,11 @@
      "hint": "Continued frequency and duration, adjustments, progression strategy."
     }
    ],
-   "setting": "home_health"
+   "setting": "home_health",
+   "type": "reeval",
+   "variant": "v1.0 superseded",
+   "emr": "generic",
+   "agency": "mmhc"
   },
   {
    "name": "HelloNote PT Evaluation",
@@ -668,7 +784,11 @@
      "hint": "Past functional status compared to current, with the clinical reasoning behind the current functional limitations."
     }
    ],
-   "setting": "outpatient"
+   "setting": "outpatient",
+   "type": "eval",
+   "variant": "HelloNote",
+   "emr": "hellonote",
+   "agency": "mmhc"
   },
   {
    "name": "HCHB Skilled Intervention Phrases",
@@ -701,7 +821,11 @@
      "text": "Skilled intervention provided to address deficits in transfers and gait impacting household mobility and safety. Patient instructed in controlled sit-to-stand sequencing, slow positional changes, safe turning, posture, pacing, AD use as applicable, and caregiver supervision as needed. Gait training focused on safest mobility strategy in the home while reducing fall risk and maintaining precautions."
     }
    ],
-   "setting": "home_health"
+   "setting": "home_health",
+   "type": "phrases",
+   "variant": "HCHB",
+   "emr": "hchb",
+   "agency": "mmhc"
   }
  ]
 }
