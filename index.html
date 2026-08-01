@@ -30,16 +30,14 @@
     background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px,5px 5px;background-repeat:no-repeat}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   @media (max-width:460px){.row2{grid-template-columns:1fr}}
-  .capture{display:flex;gap:14px;align-items:center;margin:4px 0 14px}
   button{font-family:var(--sans);cursor:pointer}
-  .mic{width:62px;height:62px;flex:0 0 62px;border-radius:50%;border:none;background:var(--teal);color:#fff;display:grid;place-items:center;box-shadow:0 2px 0 var(--teal-deep);transition:background .15s}
-  .mic svg{width:24px;height:24px;fill:currentColor}
-  .mic.live{background:var(--amber);box-shadow:0 2px 0 #7C3D06;animation:pulse 1.6s ease-out infinite}
-  .mic:disabled{background:var(--line);box-shadow:none;cursor:not-allowed}
-  @keyframes pulse{0%{box-shadow:0 2px 0 #7C3D06,0 0 0 0 rgba(184,92,11,.45)}70%{box-shadow:0 2px 0 #7C3D06,0 0 0 16px rgba(184,92,11,0)}100%{box-shadow:0 2px 0 #7C3D06,0 0 0 0 rgba(184,92,11,0)}}
-  @media (prefers-reduced-motion:reduce){.mic.live{animation:none}}
-  .capture-copy strong{display:block;font-size:15px}
-  .capture-copy small{color:var(--ink-2)}
+  .count{font-family:var(--mono);font-size:11px;color:var(--ink-2)}
+  .btn.rec{background:var(--amber);border-color:var(--amber);color:#fff}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#fff;margin-right:6px;
+    vertical-align:middle;animation:blink 1.2s ease-in-out infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+  @media (prefers-reduced-motion:reduce){.dot{animation:none}}
+  #raw{min-height:220px}
   textarea{width:100%;min-height:180px;padding:12px;border:1px solid var(--line);border-radius:10px;font-family:var(--sans);font-size:15px;line-height:1.55;color:var(--ink);resize:vertical;background:#fff}
   textarea.small{min-height:120px;font-family:var(--mono);font-size:13px}
   textarea:focus,select:focus,button:focus-visible,input:focus-visible{outline:2px solid var(--teal);outline-offset:1px}
@@ -101,7 +99,7 @@
     <button class="link" id="openAdmin" style="margin-left:auto">Manage profiles</button>
   </header>
   <div class="phi">
-    Dictation is sent for structuring and nothing is saved on this page &mdash; closing the tab clears it.
+    Dictate on the tablet keyboard, paste here. The text is sent for structuring and nothing is saved on this page &mdash; closing the tab clears it.
     Say roles, not names, and confirm BAA coverage before running identified visits through it.
   </div>
 
@@ -132,17 +130,17 @@
       </section>
 
       <section class="panel">
-        <h2 class="panel-title">2 &mdash; Dictate</h2>
-        <div class="capture">
-          <button class="mic" id="mic" aria-label="Start dictation">
-            <svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-3.1A7 7 0 0 0 19 11h-2z"/></svg>
-          </button>
-          <div class="capture-copy">
-            <strong id="micLabel">Start dictation</strong>
-            <small id="micHelp">Or type and paste into the box below.</small>
+        <div class="panel-head" style="margin-bottom:8px">
+          <h2 class="panel-title">2 &mdash; Paste the dictation</h2>
+          <div style="display:flex;gap:10px;align-items:center">
+            <span class="count" id="count"></span>
+            <button class="btn sm" id="micBtn" title="Records through the browser's speech recognizer. The Samsung keyboard mic keeps audio on the tablet.">Mic</button>
+            <button class="btn sm" id="pasteBtn">Paste</button>
           </div>
         </div>
-        <textarea id="raw" placeholder="The visit as you'd say it out loud — what the patient reported, what you observed and measured, what you did, how they responded, what's next."></textarea>
+        <textarea id="raw" placeholder="Tap the mic on the Samsung keyboard and talk, or paste what you already dictated.
+
+Punctuation and run-on sentences don't matter — say what the patient reported, what you observed and measured, what you did, how they responded, and what's next."></textarea>
         <div class="actions">
           <button class="btn primary" id="build">Build the note</button>
           <button class="btn" id="clear">New patient</button>
@@ -295,32 +293,61 @@ function resolve(note){
   })});
 }
 
-/* ---------------- speech ---------------- */
+/* ---------------- capture ---------------- */
+const raw=$("raw");
+function count(){
+  const w = raw.value.trim() ? raw.value.trim().split(/\s+/).length : 0;
+  $("count").textContent = listening ? "listening…" : (w ? w+" words" : "");
+}
+raw.addEventListener("input",count);
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const micBtn=$("micBtn");
 let rec=null, listening=false, committed="";
-const raw=$("raw"), mic=$("mic"), micLabel=$("micLabel"), micHelp=$("micHelp");
-if(!SR){ mic.disabled=true; micLabel.textContent="Dictation unavailable";
-  micHelp.textContent="This browser has no speech input. Use Chrome, or dictate with the keyboard mic and paste below."; }
-else mic.addEventListener("click",()=>listening?stopRec():startRec());
+if(!SR){ micBtn.disabled=true; micBtn.title="This browser has no speech input — use the keyboard mic, then paste."; }
+else micBtn.addEventListener("click",()=>listening?stopRec():startRec());
+
 function startRec(){
   rec=new SR(); rec.continuous=true; rec.interimResults=true; rec.lang="en-US";
-  committed = raw.value ? raw.value.replace(/\s+$/,"")+" " : "";
-  rec.onresult=e=>{ let interim="";
-    for(let i=e.resultIndex;i<e.results.length;i++){ const tr=e.results[i][0].transcript;
-      if(e.results[i].isFinal) committed+=tr.trim()+" "; else interim+=tr; }
-    raw.value=committed+interim; raw.scrollTop=raw.scrollHeight; };
-  rec.onerror=e=>{ if(e.error==="not-allowed"){ showErr("Microphone blocked. Allow mic access for this site, then start again."); stopRec(); } };
+  committed = raw.value.trim() ? raw.value.trim()+" " : "";
+  rec.onresult=e=>{
+    let interim="";
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const t=e.results[i][0].transcript;
+      if(e.results[i].isFinal) committed += t.trim()+" "; else interim += t;
+    }
+    raw.value = committed + interim;
+    raw.scrollTop = raw.scrollHeight;
+    count();
+  };
+  rec.onerror=e=>{
+    if(e.error==="not-allowed"){ showErr("Microphone blocked. Allow mic access for this site, or dictate with the keyboard mic and paste."); stopRec(); }
+  };
   rec.onend=()=>{ if(listening){ try{rec.start()}catch(_){} } };
   try{ rec.start(); }catch(_){}
-  listening=true; mic.classList.add("live");
-  micLabel.textContent="Listening — tap to stop";
-  micHelp.textContent="Pauses are fine. Keep talking through the whole visit.";
+  listening=true;
+  micBtn.classList.add("rec");
+  micBtn.innerHTML='<span class="dot"></span>Stop';
+  showErr("");
 }
 function stopRec(){
-  listening=false; mic.classList.remove("live");
+  listening=false;
   if(rec){ try{rec.stop()}catch(_){} rec=null; }
-  micLabel.textContent="Start dictation"; micHelp.textContent="Or type and paste into the box below.";
+  micBtn.classList.remove("rec");
+  micBtn.textContent="Mic";
+  count();
 }
+
+$("pasteBtn").addEventListener("click",async()=>{
+  try{
+    const t=await navigator.clipboard.readText();
+    if(!t){ showErr("Clipboard is empty."); return; }
+    raw.value = raw.value.trim() ? raw.value.trim()+"\n\n"+t : t;
+    count(); showErr("");
+  }catch(_){
+    showErr("Couldn't read the clipboard — long-press the box and paste instead.");
+    raw.focus();
+  }
+});
 
 /* ---------------- prompting ---------------- */
 const SETTINGS={
@@ -350,20 +377,50 @@ const rules = note =>
 - Use ONLY facts present in the dictation. Never invent measurements, vitals, scores, dates, or diagnoses.
 - Third person, past tense, professional clinical prose. No markdown formatting.
 - Expand shorthand (amb, HEP, min A, WFL) into standard clinical terms.
+- The dictation is raw voice-to-text: expect missing punctuation, run-on sentences, and speech recognition errors. Correct obvious misrecognitions of clinical terms and rewrite into clean prose. Never preserve verbatim phrasing.
 - ${EMPHASIS_TEXT()}
 - ${$("scrub").checked ? 'Replace every proper name with a role: "the patient", "the daughter", "the physician". Omit dates of birth, addresses, phone numbers, and record numbers.' : 'Keep names exactly as dictated.'}
 ${setting().rules.map(r=>"- "+r).join("\n")}\n${((note&&note.rules)||[]).map(r=>"- "+r).join("\n")}`;
 
-async function ask(prompt){
-  const res=await fetch("https://api.anthropic.com/v1/messages",{
-    method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,messages:[{role:"user",content:prompt}]})});
-  if(!res.ok) throw new Error("status "+res.status);
-  const data=await res.json();
-  const out=data.content.filter(b=>b.type==="text").map(b=>b.text).join("").replace(/```json|```/g,"").trim();
-  try{ return JSON.parse(out); }
-  catch(_){ return JSON.parse(out.slice(out.indexOf("{"),out.lastIndexOf("}")+1)); }
+let BACKEND = null;   /* "server" once /api/build answers, "sandbox" when only the direct call works */
+
+function parseJSON(out){
+  const t = out.replace(/```json|```/g,"").trim();
+  try{ return JSON.parse(t); }
+  catch(_){ return JSON.parse(t.slice(t.indexOf("{"), t.lastIndexOf("}")+1)); }
 }
+
+async function ask(prompt){
+  /* preferred path: same-origin function that holds the API key */
+  if(BACKEND !== "sandbox"){
+    try{
+      const r = await fetch("/api/build",{
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({prompt, max_tokens:2000})});
+      if(r.ok){ BACKEND="server"; return parseJSON((await r.json()).text||""); }
+      if(r.status !== 404){
+        const e = await r.json().catch(()=>({}));
+        throw new Error(e.error || ("server "+r.status));
+      }
+    }catch(err){
+      if(BACKEND === "server") throw err;         /* backend exists but broke — report it */
+    }
+  }
+  /* fallback: direct call, which only works inside Claude's preview sandbox */
+  try{
+    const res = await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,
+        messages:[{role:"user",content:prompt}]})});
+    if(!res.ok) throw new Error("status "+res.status);
+    BACKEND="sandbox";
+    const data=await res.json();
+    return parseJSON(data.content.filter(b=>b.type==="text").map(b=>b.text).join(""));
+  }catch(err){
+    throw new Error("NOBACKEND");
+  }
+}
+
 function chunk(a,n){const o=[];for(let i=0;i<a.length;i+=n)o.push(a.slice(i,i+n));return o;}
 
 function fieldPrompt(note,group,text){
@@ -394,10 +451,12 @@ Respond with ONLY a JSON object whose keys are exactly the section ids above and
 $("build").addEventListener("click",()=>build(false));
 $("rebuild").addEventListener("click",()=>build(true));
 $("clear").addEventListener("click",()=>{
-  raw.value=""; committed=""; STATE={}; showErr(""); draw();
+  if(listening) stopRec();
+  raw.value=""; committed=""; STATE={}; showErr(""); count(); draw();
 });
 
 async function build(all){
+  if(listening) stopRec();
   const note=resolve(activeNote());
   if(note.mode==="snippets"){ showErr(""); draw(); return; }
   const text=raw.value.trim();
@@ -419,7 +478,11 @@ async function build(all){
       draw(pend);
     }
   }catch(err){
-    showErr("Build failed ("+err.message+"). The dictation is still in the box — try again, or split a long dictation in half.");
+    showErr(err.message==="NOBACKEND"
+      ? `<b>No model backend reachable.</b> Your dictation is safe in the box.<br>
+         This page needs <code>api/build.js</code> deployed alongside it with <code>ANTHROPIC_API_KEY</code> set,
+         or to be opened inside the Claude preview. Opening the HTML straight from disk will always fail here.`
+      : "Build failed ("+err.message+"). The dictation is still in the box — try again, or split a long dictation in half.");
   }finally{ btn.disabled=false; $("rebuild").disabled=false; btn.textContent="Build the note"; draw(); }
 }
 
@@ -572,7 +635,9 @@ TEMPLATE:
     const reused=parsed.sections.filter(s=>BLOCKS[s.ref]).length;
     afterSave(`${name} saved — ${parsed.sections.length} sections, ${reused} reusing a shared block.`);
   }catch(err){
-    tplMsg("Couldn't read that template ("+err.message+"). Try trimming it to the section order and output rules.","err");
+    tplMsg(err.message==="NOBACKEND"
+      ? "No model backend reachable — deploy api/build.js with ANTHROPIC_API_KEY set."
+      : "Couldn't read that template ("+err.message+"). Try trimming it to the section order and output rules.","err");
   }finally{ btn.disabled=false; btn.textContent="Add profile"; }
 }
 function afterSave(msg){
@@ -644,7 +709,7 @@ async function boot(){
     const f=JSON.parse(JSON.stringify(FALLBACK));
     BLOCKS=f.blocks; PROFILES=f.profiles; EMRS=f.emrs; onFallback=true;
   }
-  refreshEmrs(); refreshTypes(); refreshEmphasis(); renderLib(); draw();
+  refreshEmrs(); refreshTypes(); refreshEmphasis(); renderLib(); draw(); count();
 }
 boot();
 </script>
