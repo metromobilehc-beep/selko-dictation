@@ -382,7 +382,8 @@ const rules = note =>
 - ${$("scrub").checked ? 'Replace every proper name with a role: "the patient", "the daughter", "the physician". Omit dates of birth, addresses, phone numbers, and record numbers.' : 'Keep names exactly as dictated.'}
 ${setting().rules.map(r=>"- "+r).join("\n")}\n${((note&&note.rules)||[]).map(r=>"- "+r).join("\n")}`;
 
-let BACKEND = null;   /* "server" once /api/build answers, "sandbox" when only the direct call works */
+let BACKEND = null;      /* "server" | "sandbox" once one path answers */
+let DIAG = {server:"not tried", direct:"not tried"};
 
 function parseJSON(out){
   const t = out.replace(/```json|```/g,"").trim();
@@ -390,35 +391,60 @@ function parseJSON(out){
   catch(_){ return JSON.parse(t.slice(t.indexOf("{"), t.lastIndexOf("}")+1)); }
 }
 
-async function ask(prompt){
-  /* preferred path: same-origin function that holds the API key */
-  if(BACKEND !== "sandbox"){
-    try{
-      const r = await fetch("/api/build",{
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({prompt, max_tokens:2000})});
-      if(r.ok){ BACKEND="server"; return parseJSON((await r.json()).text||""); }
-      if(r.status !== 404){
-        const e = await r.json().catch(()=>({}));
-        throw new Error(e.error || ("server "+r.status));
-      }
-    }catch(err){
-      if(BACKEND === "server") throw err;         /* backend exists but broke — report it */
-    }
+async function tryServer(prompt){
+  const r = await fetch("/api/build",{method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({prompt, max_tokens:2000})});
+  const ct = (r.headers.get("content-type")||"");
+  if(!r.ok){
+    if(r.status===404){ DIAG.server="not deployed (404)"; return null; }
+    let msg = "HTTP "+r.status;
+    if(ct.includes("json")){ const e=await r.json().catch(()=>({})); msg = e.error || msg; }
+    DIAG.server = msg;
+    throw new Error(msg);                       /* deployed but misconfigured — real error */
   }
-  /* fallback: direct call, which only works inside Claude's preview sandbox */
-  try{
-    const res = await fetch("https://api.anthropic.com/v1/messages",{
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,
-        messages:[{role:"user",content:prompt}]})});
-    if(!res.ok) throw new Error("status "+res.status);
-    BACKEND="sandbox";
-    const data=await res.json();
-    return parseJSON(data.content.filter(b=>b.type==="text").map(b=>b.text).join(""));
-  }catch(err){
+  if(!ct.includes("json")){ DIAG.server="no function at this path"; return null; }
+  DIAG.server="ok"; BACKEND="server";
+  return parseJSON((await r.json()).text||"");
+}
+
+async function tryDirect(prompt){
+  const res = await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1500,
+      messages:[{role:"user",content:prompt}]})});
+  if(!res.ok){ DIAG.direct="HTTP "+res.status; throw new Error("direct "+res.status); }
+  DIAG.direct="ok"; BACKEND="sandbox";
+  const data=await res.json();
+  return parseJSON(data.content.filter(b=>b.type==="text").map(b=>b.text).join(""));
+}
+
+async function ask(prompt){
+  if(BACKEND==="server")  return tryServer(prompt);
+  if(BACKEND==="sandbox") return tryDirect(prompt);
+  let out=null;
+  try{ out = await tryServer(prompt); }
+  catch(err){ if(DIAG.server!=="not deployed (404)") throw err; }
+  if(out) return out;
+  try{ return await tryDirect(prompt); }
+  catch(err){
+    if(DIAG.direct==="not tried") DIAG.direct="blocked by the browser";
     throw new Error("NOBACKEND");
   }
+}
+
+function whereAmI(){
+  const p = location.protocol;
+  if(p==="file:")   return "You opened the file from disk (file://). Neither path can work here — the function isn't running and the browser blocks the direct call.";
+  if(p==="blob:" || location.hostname==="")
+                    return "This page is running from a sandboxed frame.";
+  if(location.hostname==="localhost"||location.hostname==="127.0.0.1")
+                    return "Running locally. <code>npx serve</code> does not run the function — use <code>vercel dev</code> instead.";
+  return `Running on ${location.hostname}. Open
+    <a href="/api/build" target="_blank" style="color:inherit"><code>/api/build</code></a> in a new tab —
+    it should return <code>{"ok":true,"function":"deployed","keySet":true}</code>.
+    If you get a 404 page, <code>api/build.mjs</code> isn't in the deployment.
+    If <code>keySet</code> is false, add <code>ANTHROPIC_API_KEY</code> in Settings &rarr; Environment Variables and redeploy.`;
 }
 
 function chunk(a,n){const o=[];for(let i=0;i<a.length;i+=n)o.push(a.slice(i,i+n));return o;}
@@ -479,9 +505,10 @@ async function build(all){
     }
   }catch(err){
     showErr(err.message==="NOBACKEND"
-      ? `<b>No model backend reachable.</b> Your dictation is safe in the box.<br>
-         This page needs <code>api/build.js</code> deployed alongside it with <code>ANTHROPIC_API_KEY</code> set,
-         or to be opened inside the Claude preview. Opening the HTML straight from disk will always fail here.`
+      ? `<b>Can't reach a model backend.</b> Your dictation is safe in the box — nothing was lost.<br><br>
+         <code>/api/build</code> &rarr; ${DIAG.server}<br>
+         <code>api.anthropic.com</code> &rarr; ${DIAG.direct}<br><br>
+         ${whereAmI()}`
       : "Build failed ("+err.message+"). The dictation is still in the box — try again, or split a long dictation in half.");
   }finally{ btn.disabled=false; $("rebuild").disabled=false; btn.textContent="Build the note"; draw(); }
 }
