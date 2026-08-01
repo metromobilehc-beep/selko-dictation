@@ -26,7 +26,13 @@ export default async function handler(req, res) {
     });
   }
 
-  const { prompt, max_tokens } = req.body || {};
+  const MODELS = {
+    haiku:  "claude-haiku-4-5-20251001",
+    sonnet: "claude-sonnet-4-6"
+  };
+
+  const { prompt, max_tokens, model } = req.body || {};
+  const chosen = MODELS[model] || MODELS.haiku;   // cheapest by default
   if (!prompt || typeof prompt !== "string") {
     return res.status(400).json({ error: "Missing prompt." });
   }
@@ -43,7 +49,7 @@ export default async function handler(req, res) {
         "anthropic-version": "2023-06-01"
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
+        model: chosen,
         max_tokens: Math.min(Math.max(parseInt(max_tokens) || 2000, 256), 4000),
         messages: [{ role: "user", content: prompt }]
       })
@@ -57,13 +63,17 @@ export default async function handler(req, res) {
       });
     }
 
-    // Return only the text. No dictation, no output, nothing logged.
+    // Return only the text plus token counts. No dictation, no output, nothing logged.
     const text = (data.content || [])
       .filter(b => b.type === "text")
       .map(b => b.text)
       .join("");
 
-    return res.status(200).json({ text });
+    return res.status(200).json({
+      text,
+      model: chosen,
+      usage: data.usage || null
+    });
   } catch (err) {
     return res.status(502).json({ error: "Could not reach the model API." });
   }
