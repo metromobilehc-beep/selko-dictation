@@ -76,6 +76,21 @@
   .empty b{display:block;color:var(--ink);font-family:var(--display);font-size:19px;font-weight:600;margin-bottom:6px}
   .err{background:#FDEDED;border-left:3px solid #B3261E;color:#7A1C15;padding:10px 12px;border-radius:0 8px 8px 0;font-size:13px;margin-bottom:12px}
   .ok{background:var(--mint);border-left:3px solid var(--teal);color:var(--teal-deep);padding:10px 12px;border-radius:0 8px 8px 0;font-size:13px;margin-bottom:12px}
+  .link{background:none;border:none;color:var(--teal);font-size:13px;text-decoration:underline;padding:4px}
+  .overlay{position:fixed;inset:0;background:rgba(15,32,40,.45);display:flex;justify-content:center;
+    align-items:flex-start;padding:24px 16px;overflow-y:auto;z-index:50}
+  .overlay[hidden]{display:none}
+  .sheet{background:var(--paper);border-radius:var(--radius);max-width:720px;width:100%;padding:22px;box-shadow:0 12px 40px rgba(15,32,40,.3)}
+  .sheet h3{font-family:var(--display);font-size:22px;font-weight:600;margin:0 0 4px}
+  .sheet .sub{color:var(--ink-2);font-size:13px;margin-bottom:18px}
+  .adm-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+  .step{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);margin:0 0 8px}
+  .seg{display:flex;gap:0;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff}
+  .seg button{flex:1;padding:10px;border:none;background:#fff;font-size:13px;color:var(--ink-2)}
+  .seg button.on{background:var(--teal);color:#fff}
+  .prof-group{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);margin:14px 0 6px}
+  .tpl-item.active{border-color:var(--teal);background:var(--mint)}
+  .paste-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
   footer{margin-top:26px;font-size:12px;color:var(--ink-2);text-align:center}
 </style>
 
@@ -83,6 +98,7 @@
   <header class="top">
     <div class="mark">Selko <span>Dictate</span></div>
     <div class="tagline">Speak the visit once. Paste it back section by section.</div>
+    <button class="link" id="openAdmin" style="margin-left:auto">Manage profiles</button>
   </header>
   <div class="phi">
     Dictation is sent for structuring and nothing is saved on this page &mdash; closing the tab clears it.
@@ -135,54 +151,12 @@
           <span>Strip names and identifiers &mdash; output refers to the patient by role only.</span></label>
       </section>
 
-      <section class="panel">
-        <div class="panel-head">
-          <h2 class="panel-title">3 &mdash; Templates</h2>
-          <div style="display:flex;gap:8px">
-            <button class="btn sm" id="importBtn">Import</button>
-            <button class="btn sm" id="exportBtn">Export</button>
-          </div>
-        </div>
-        <input type="file" id="importFile" accept=".json" hidden>
-        <input type="file" id="tplFile" accept=".txt,.md,.csv,.json" hidden>
-        <div id="tplMsg"></div>
-        <div class="row2">
-          <div class="setting">
-            <label for="tplName">Name it</label>
-            <input type="text" id="tplName" placeholder="BIOS PT recert, Hyland OP eval…">
-          </div>
-          <div class="setting">
-            <label for="tplEmr">Belongs to</label>
-            <select id="tplEmr"></select>
-          </div>
-        </div>
-        <textarea id="tplBody" class="small" placeholder="Paste a new SOP or EMR template — section order, output rules, and any approved language."></textarea>
-        <div class="row2">
-          <div class="setting">
-            <label for="tplType">Note type</label>
-            <select id="tplType"></select>
-          </div>
-          <div class="setting">
-            <label for="tplDisc">Discipline</label>
-            <select id="tplDisc"><option>PT</option><option>PTA</option><option>OT</option><option>COTA</option><option>SLP</option></select>
-          </div>
-        </div>
-        <div class="actions">
-          <button class="btn primary" id="tplFields">Read as sections</button>
-          <button class="btn" id="tplFill">Read as fill-in note</button>
-          <button class="btn sm" id="tplUpload">Load a file</button>
-        </div>
-        <div style="font-size:12px;color:var(--ink-2);margin-top:10px">
-          Sections that match a shared block (homebound, medical necessity, goals&hellip;) inherit its definition and carry-forward behavior automatically.
-        </div>
-        <div id="tplList" style="margin-top:14px"></div>
-      </section>
     </div>
 
     <div>
       <section class="panel">
         <div class="panel-head">
-          <h2 class="panel-title">4 &mdash; Paste in this order</h2>
+          <h2 class="panel-title">3 &mdash; Paste in this order</h2>
           <div style="display:flex;gap:8px">
             <button class="btn sm" id="rebuild">Rebuild all</button>
             <button class="btn sm" id="copyAll">Copy all</button>
@@ -194,6 +168,70 @@
     </div>
   </div>
   <footer>Selko Dictate &middot; draft output requires clinician review before signing</footer>
+</div>
+
+<div class="overlay" id="admin" hidden>
+  <div class="sheet">
+    <div class="adm-head">
+      <div>
+        <h3>Profiles</h3>
+        <div class="sub">A profile is one EMR's section order for one note type and discipline.
+          Sections that match a shared block inherit its definition and carry-forward behavior.</div>
+      </div>
+      <button class="btn sm" id="closeAdmin">Done</button>
+    </div>
+
+    <div class="panel">
+      <p class="step">Installed</p>
+      <div id="tplList"></div>
+      <div class="actions">
+        <button class="btn sm" id="importBtn">Import library</button>
+        <button class="btn sm" id="exportBtn">Export library</button>
+      </div>
+      <input type="file" id="importFile" accept=".json" hidden>
+    </div>
+
+    <div class="panel">
+      <p class="step">Add a profile</p>
+      <div id="tplMsg"></div>
+      <div class="setting">
+        <label for="tplEmr">1. Which EMR is this for?</label>
+        <select id="tplEmr"></select>
+      </div>
+      <div class="row2">
+        <div class="setting">
+          <label for="tplType">2. Note type</label>
+          <select id="tplType"></select>
+        </div>
+        <div class="setting">
+          <label for="tplDisc">3. Discipline</label>
+          <select id="tplDisc"><option>PT</option><option>PTA</option><option>OT</option><option>COTA</option><option>SLP</option></select>
+        </div>
+      </div>
+      <div class="setting">
+        <div class="paste-row">
+          <label for="tplBody" style="margin:0">4. Paste the template</label>
+          <button class="link" id="tplUpload">load from a file</button>
+        </div>
+        <textarea id="tplBody" class="small" placeholder="Section order, output rules, and any approved language — copied out of the EMR or the agency's SOP."></textarea>
+        <input type="file" id="tplFile" accept=".txt,.md,.csv,.json" hidden>
+      </div>
+      <div class="setting">
+        <label>5. How should it come back?</label>
+        <div class="seg" id="modeSeg">
+          <button type="button" data-mode="fields" class="on">Separate sections</button>
+          <button type="button" data-mode="fill">One filled-in note</button>
+        </div>
+      </div>
+      <div class="setting">
+        <label for="tplName">6. Name it <span style="text-transform:none;letter-spacing:0">(optional)</span></label>
+        <input type="text" id="tplName" placeholder="Leave blank to name it from the choices above">
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="tplAdd">Add profile</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -481,6 +519,15 @@ function showErr(m){ $("err").innerHTML = m?`<div class="err">${m}</div>`:""; }
 function tplMsg(m,kind){ $("tplMsg").innerHTML = m?`<div class="${kind}">${m}</div>`:""; }
 
 /* ---------------- template intake ---------------- */
+let TPL_MODE="fields";
+document.querySelectorAll("#modeSeg button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("#modeSeg button").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on"); TPL_MODE=b.dataset.mode;
+}));
+$("openAdmin").addEventListener("click",()=>{ $("admin").hidden=false; renderLib(); });
+$("closeAdmin").addEventListener("click",()=>{ $("admin").hidden=true; tplMsg(""); });
+$("admin").addEventListener("click",e=>{ if(e.target.id==="admin"){ $("admin").hidden=true; tplMsg(""); } });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") $("admin").hidden=true; });
 $("tplUpload").addEventListener("click",()=>$("tplFile").click());
 $("tplFile").addEventListener("change",e=>{
   const f=e.target.files[0]; if(!f) return;
@@ -488,17 +535,18 @@ $("tplFile").addEventListener("change",e=>{
   r.onload=()=>{ $("tplBody").value=r.result; if(!$("tplName").value) $("tplName").value=f.name.replace(/\.[^.]+$/,""); };
   r.readAsText(f); e.target.value="";
 });
-$("tplFields").addEventListener("click",()=>readTemplate("fields"));
-$("tplFill").addEventListener("click",()=>readTemplate("fill"));
+$("tplAdd").addEventListener("click",()=>readTemplate(TPL_MODE));
 
 async function readTemplate(mode){
   const body=$("tplBody").value.trim();
   if(!body){ tplMsg("Paste a template first, or load one from a file.","err"); return; }
-  const name=$("tplName").value.trim() || "Untitled template";
+  const name = $("tplName").value.trim() ||
+    `${(EMRS[$("tplEmr").value]||{}).label||""} · ${TYPE_NAMES[$("tplType").value]} · ${$("tplDisc").value}`;
   if(mode==="fill"){ PROFILES.push({name,mode:"fill",emr:$("tplEmr").value,type:$("tplType").value,
     discipline:$("tplDisc").value,setting:(EMRS[$("tplEmr").value]||{}).setting,
-    agency:"custom",source:"pasted in app",body,rules:[]}); afterSave(name+" saved as a fill-in note."); return; }
-  const btn=$("tplFields"); btn.disabled=true; btn.textContent="Reading…";
+    agency:"custom",source:"pasted in app",body,rules:[]});
+    afterSave(name+" added — it will come back as one filled-in note."); return; }
+  const btn=$("tplAdd"); btn.disabled=true; btn.textContent="Reading…";
   const sk=(EMRS[$("tplEmr").value]||{}).setting||"home_health";
   const ids=Object.keys(BLOCKS).filter(b=>BLOCKS[b].scope==="both"||(BLOCKS[b].scope==="hh")===(sk==="home_health")).join(", ");
   const prompt =
@@ -525,25 +573,42 @@ TEMPLATE:
     afterSave(`${name} saved — ${parsed.sections.length} sections, ${reused} reusing a shared block.`);
   }catch(err){
     tplMsg("Couldn't read that template ("+err.message+"). Try trimming it to the section order and output rules.","err");
-  }finally{ btn.disabled=false; btn.textContent="Read as sections"; }
+  }finally{ btn.disabled=false; btn.textContent="Add profile"; }
 }
 function afterSave(msg){
   $("tplBody").value=""; $("tplName").value="";
   refreshEmrs(); refreshTypes(); renderLib(); draw(); tplMsg(msg,"ok");
+  $("tplBody").scrollIntoView({block:"nearest"});
 }
 function renderLib(){
-  const el=$("tplList"); el.innerHTML="";
-  PROFILES.forEach((n,i)=>{
-    const d=document.createElement("div"); d.className="tpl-item";
-    d.innerHTML=`<span class="name"></span><span class="meta"></span><button class="x" title="Remove">&times;</button>`;
-    d.querySelector(".name").textContent=
-      (EMRS[n.emr]?EMRS[n.emr].label:n.emr)+" · "+(TYPE_NAMES[n.type]||n.type)+" · "+n.discipline;
-    d.querySelector(".meta").textContent = n.mode==="snippets" ? n.snippets.length+" phrases"
-      : n.mode==="fill" ? "fill-in" : n.sections.length+" sections";
-    d.querySelector(".x").addEventListener("click",()=>{
-      PROFILES.splice(i,1); renderLib(); refreshEmrs(); refreshTypes(); draw(); });
-    el.appendChild(d);
+  const el=$("tplList"); if(!el) return;
+  el.innerHTML="";
+  const covered=new Set(PROFILES.map(p=>p.emr));
+  Object.keys(EMRS).forEach(ek=>{
+    const items=PROFILES.map((p,i)=>[p,i]).filter(([p])=>p.emr===ek);
+    if(!items.length) return;
+    const h=document.createElement("p"); h.className="prof-group"; h.textContent=EMRS[ek].label;
+    el.appendChild(h);
+    items.sort((a,b)=>TYPE_ORDER.indexOf(a[0].type)-TYPE_ORDER.indexOf(b[0].type));
+    items.forEach(([n,i])=>{
+      const d=document.createElement("div");
+      d.className="tpl-item"+(RESOLVED===n?" active":"");
+      d.innerHTML=`<span class="name"></span><span class="meta"></span><button class="x" title="Remove">&times;</button>`;
+      d.querySelector(".name").textContent=(TYPE_NAMES[n.type]||n.type)+" · "+n.discipline
+        +(RESOLVED===n?"  — in use":"");
+      d.querySelector(".meta").textContent = n.mode==="snippets" ? n.snippets.length+" phrases"
+        : n.mode==="fill" ? "fill-in" : n.sections.length+" sections";
+      d.querySelector(".x").addEventListener("click",()=>{
+        if(!confirm(`Remove the ${EMRS[ek].label} ${TYPE_NAMES[n.type]||n.type} profile?`)) return;
+        PROFILES.splice(i,1); renderLib(); refreshEmrs(); refreshTypes(); draw(); });
+      el.appendChild(d);
+    });
   });
+  const gaps=Object.keys(EMRS).filter(k=>!covered.has(k));
+  const f=document.createElement("p"); f.className="sub"; f.style.margin="14px 0 0";
+  f.textContent = PROFILES.length+" profiles across "+covered.size+" EMR"+(covered.size>1?"s":"")
+    + (gaps.length ? ".  No profiles yet for "+gaps.map(g=>EMRS[g].label).join(", ")+"." : ".");
+  el.appendChild(f);
 }
 $("exportBtn").addEventListener("click",()=>{
   const blob=new Blob([JSON.stringify({emrs:EMRS,blocks:BLOCKS,profiles:PROFILES},null,1)],{type:"application/json"});
